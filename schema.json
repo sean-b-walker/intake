@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "properties": {
+    "ask": {
+      "type": "string",
+      "enum": ["absence", "uniform", "fees", "records", "welfare", "complaint", "other"]
+    },
+    "when": {
+      "type": "string",
+      "enum": ["routine", "soon", "today"]
+    },
+    "outcome": {
+      "type": "string",
+      "enum": ["draft", "person", "file"]
+    },
+    "citation": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    }
+  },
+  "required": ["ask", "when", "outcome", "citation", "note"],
+  "additionalProperties": false
+}

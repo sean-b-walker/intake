@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Front office</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #efeae2;
+      color: #221f1b;
+      font: 16px/1.45 Georgia, "Iowan Old Style", Palatino, serif;
+    }
+    header, button, .slip, details, .hint {
+      font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+    header {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 22px 18px 0;
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      margin: 0 0 4px;
+    }
+    .hint {
+      margin: 0;
+      color: #5c564e;
+      font-size: 14px;
+    }
+    .picks {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-width: 980px;
+      margin: 14px auto 0;
+      padding: 0 18px;
+    }
+    button {
+      font: 13px/1.2 "Segoe UI", Helvetica, Arial, sans-serif;
+      border: 1px solid #c9c0b2;
+      background: #f7f4ee;
+      color: #221f1b;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    button.on {
+      background: #221f1b;
+      color: #f7f4ee;
+      border-color: #221f1b;
+    }
+    main {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 18px;
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+    .letter, .slip {
+      background: #fbf8f3;
+      border: 1px solid #d9d2c5;
+      padding: 16px 18px;
+      min-height: 280px;
+    }
+    .who, .subject {
+      font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      margin: 0 0 8px;
+    }
+    .subject { font-weight: 600; }
+    .body { white-space: pre-wrap; margin: 0; }
+    mark {
+      background: #f3e2a7;
+      padding: 0 2px;
+    }
+    .outcome {
+      font-size: 18px;
+      line-height: 1.35;
+      margin: 0 0 10px;
+    }
+    .slip.draft { border-top: 4px solid #2f5d3a; }
+    .slip.person { border-top: 4px solid #8c3a2f; }
+    .slip.file { border-top: 4px solid #6e675e; }
+    .meta {
+      color: #5c564e;
+      font-size: 13px;
+      margin: 0 0 12px;
+    }
+    blockquote {
+      margin: 0 0 12px;
+      padding-left: 10px;
+      border-left: 3px solid #e0c56a;
+    }
+    .note { margin: 0 0 10px; }
+    .quiet {
+      color: #5c564e;
+      font-size: 13px;
+      margin: 8px 0 0;
+    }
+    details { margin-top: 14px; }
+    summary { cursor: pointer; font-size: 14px; }
+    pre {
+      white-space: pre-wrap;
+      font: 12px/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      background: #f3efe8;
+      padding: 10px;
+      margin: 8px 0 0;
+    }
+    .check p { margin: 8px 0; font-size: 14px; }
+    @media (max-width: 800px) {
+      main { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Front office</h1>
+    <p class="hint">Absence, then the refund, the camp form, and the one with a student number.</p>
+  </header>
+  <div class="picks" id="picks"></div>
+  <main>
+    <section class="letter" id="letter"></section>
+    <section>
+      <div class="slip" id="slip"></div>
+      <details>
+        <summary>What was checked</summary>
+        <div class="check" id="check"></div>
+      </details>
+    </section>
+  </main>
+  <script>
+    const words = {
+      draft: "You can draft a reply. You still send it.",
+      person: "A person needs to handle this before anyone replies.",
+      file: "Nothing to send. File it."
+    };
+    const asks = {
+      absence: "Absence",
+      uniform: "Uniform",
+      fees: "Fees",
+      records: "Student records",
+      welfare: "Welfare",
+      complaint: "Complaint",
+      other: "Other"
+    };
+    const whens = {
+      routine: "Routine",
+      soon: "In the next day or two",
+      today: "Today"
+    };
+
+    let cards = [];
+    let current = 0;
+
+    function escape(text) {
+      return String(text).replace(/[&<>"]/g, function (ch) {
+        return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch];
+      });
+    }
+
+    function mark(text, quote) {
+      if (!quote) return escape(text);
+      const at = text.indexOf(quote);
+      if (at < 0) return escape(text);
+      return escape(text.slice(0, at))
+        + "<mark>" + escape(quote) + "</mark>"
+        + escape(text.slice(at + quote.length));
+    }
+
+    function show(index) {
+      current = index;
+      const item = cards[index];
+      const facts = item.facts;
+      const card = item.card;
+      const picks = document.getElementById("picks");
+      picks.querySelectorAll("button").forEach(function (button, i) {
+        button.className = i === index ? "on" : "";
+      });
+
+      let who = escape(facts.from_name) + " &lt;" + escape(facts.from_addr) + "&gt;";
+      if (facts.reply_to) {
+        who += "<br>Reply-To: " + escape(facts.reply_to);
+      }
+
+      document.getElementById("letter").innerHTML =
+        '<p class="who">' + who + "</p>"
+        + '<p class="subject">' + mark(facts.subject, card.citation) + "</p>"
+        + '<p class="body">' + mark(facts.body, card.citation) + "</p>";
+
+      let quote = "";
+      if (card.citation) {
+        quote = "<blockquote>" + escape(card.citation) + "</blockquote>";
+      }
+      let personal = "";
+      if (item.flags.indexOf("personal") !== -1) {
+        personal = '<p class="quiet">Student number, date of birth, or phone was removed before this was read.</p>';
+      }
+
+      const slip = document.getElementById("slip");
+      slip.className = "slip " + card.outcome;
+      slip.innerHTML =
+        '<p class="outcome">' + words[card.outcome] + "</p>"
+        + '<p class="meta">' + asks[card.ask] + " · " + whens[card.when] + "</p>"
+        + quote
+        + '<p class="note">' + escape(card.note) + "</p>"
+        + personal
+        + '<p class="quiet">Nothing is sent from this page.</p>';
+
+      let held = "Slip matches the model reply.";
+      if (!item.model || item.model.outcome !== card.outcome) {
+        const said = item.model ? item.model.outcome : "nothing usable";
+        held = "Model said " + said + ". Held for a person.";
+      }
+      let errors = "";
+      if (item.errors.length) {
+        errors = "<p>" + item.errors.map(escape).join("<br>") + "</p>";
+      }
+      let shown = "";
+      if (item.shown.body !== facts.body) {
+        shown = "<p>Text the model would see</p><pre>" + escape(item.shown.body) + "</pre>";
+      }
+      let model = "";
+      if (item.model) {
+        model = "<pre>" + escape(JSON.stringify(item.model, null, 2)) + "</pre>";
+      }
+
+      document.getElementById("check").innerHTML =
+        "<p>" + (item.flags.length ? item.flags.join(", ") : "No flags.") + "</p>"
+        + "<p>" + held + "</p>"
+        + errors
+        + model
+        + shown;
+    }
+
+    fetch("/cards.json")
+      .then(function (response) { return response.json(); })
+      .then(function (loaded) {
+        cards = loaded;
+        const picks = document.getElementById("picks");
+        cards.forEach(function (item, index) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = item.label;
+          button.addEventListener("click", function () { show(index); });
+          picks.appendChild(button);
+        });
+        show(0);
+      })
+      .catch(function () {
+        document.getElementById("letter").textContent = "Run python3 show.py, then use the local page.";
+      });
+  </script>
+</body>
+</html>
